@@ -1,22 +1,19 @@
 """
 Agent API Server
-This server runs a Gemini LLM agent with LangChain that has access to tools.
-One of the tools queries the Human API.
+Simple React-style agent that queries a human via API.
 """
 import os
 import httpx
-import json
 from typing import List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.tools import tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
 
@@ -25,7 +22,7 @@ app = FastAPI(title="Agent API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vite default port
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,53 +35,76 @@ llm = ChatGoogleGenerativeAI(
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
+print("🤖 Agent initialized with Gemini 2.5 Flash")
+
 
 @tool
-def query_human(question: str, context: str = None) -> str:
-    """
-    Query a human for information or clarification.
-    Use this tool when you need human input to answer a question.
-
-    Args:
-        question: The question to ask the human
-        context: Optional context to provide with the question
-
-    Returns:
-        The human's response
-    """
+def query_human(question: str) -> str:
+    """Ask a human for information. Use this when you need human input or clarification."""
     human_api_url = os.getenv("HUMAN_API_URL", "http://localhost:8001")
+
+    print(f"\n🔧 TOOL CALLED: query_human")
+    print(f"   Question: {question}")
 
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post(
                 f"{human_api_url}/query",
-                json={"question": question, "context": context}
+                json={"question": question, "context": None}
             )
             response.raise_for_status()
             data = response.json()
-            return data["response"]
+            result = data["response"]
+            print(f"   Response: {result}\n")
+            return result
     except httpx.HTTPError as e:
-        return f"Error querying human: {str(e)}"
+        error_msg = f"Error querying human: {str(e)}"
+        print(f"   Error: {error_msg}\n")
+        return error_msg
 
 
-# Create tools list
+# Tools available to the agent
 tools = [query_human]
 
-# Create prompt template with chat history support
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful AI assistant. You have access to tools including the ability to query a human for information."),
-    MessagesPlaceholder(variable_name="chat_history", optional=True),
-    ("human", "{input}"),
-    MessagesPlaceholder(variable_name="agent_scratchpad"),
-])
+# Simple React prompt template
+template = """Answer the following questions as best you can. You have access to the following tools:
 
-# Create agent
-agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+{tools}
+
+IMPORTANT: Only use tools if you truly need them. If you can answer the question directly, do so immediately without using any tools.
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: think about whether you can answer this directly or need to use a tool
+Action: the action to take, should be one of [{tool_names}] (ONLY if needed)
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
+
+prompt = PromptTemplate.from_template(template)
+
+# Create React agent
+agent = create_react_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    handle_parsing_errors=True
+)
+
+print("✅ React agent created successfully\n")
 
 
 class Message(BaseModel):
-    role: str  # "user", "assistant", or "system"
+    role: str
     content: str
 
 
@@ -96,52 +116,27 @@ class SuggestionResponse(BaseModel):
     suggestions: List[str]
 
 
-def convert_to_langchain_message(message: Message):
-    """Convert frontend message format to LangChain message format"""
-    if message.role == "user":
-        return HumanMessage(content=message.content)
-    elif message.role == "assistant":
-        return AIMessage(content=message.content)
-    elif message.role == "system":
-        return SystemMessage(content=message.content)
-    return HumanMessage(content=message.content)
-
-
 async def generate_streaming_response(history: List[Message]):
-    """Generate streaming response from the agent"""
+    """Stream agent response to frontend"""
     try:
-        # Convert message history to LangChain format
-        chat_history = []
+        # Get the last user message
         last_user_message = ""
-
         for msg in history:
             if msg.role == "user":
                 last_user_message = msg.content
-            if msg != history[-1]:  # Don't include the last message in history
-                chat_history.append(convert_to_langchain_message(msg))
 
-        # Stream the agent's response
-        async for chunk in agent_executor.astream({
-            "input": last_user_message,
-            "chat_history": chat_history[:-1] if len(chat_history) > 0 else []
-        }):
-            # Extract the output text from the chunk
+        print(f"\n💬 User: {last_user_message}")
+
+        # Run agent and stream response
+        async for chunk in agent_executor.astream({"input": last_user_message}):
+            # Stream final output
             if "output" in chunk:
-                text = chunk["output"]
-                # Send raw text for frontend to append
-                yield text
-            elif "actions" in chunk:
-                # Agent is using a tool
-                for action in chunk["actions"]:
-                    yield f"\n[Using tool: {action.tool}]\n"
-            elif "steps" in chunk:
-                # Tool execution result
-                for step in chunk["steps"]:
-                    if hasattr(step, 'observation'):
-                        yield f"\n[Tool result: {step.observation}]\n"
+                yield chunk["output"]
 
     except Exception as e:
-        yield f"\nError: {str(e)}\n"
+        error_msg = f"Error: {str(e)}"
+        print(f"❌ {error_msg}")
+        yield error_msg
 
 
 @app.post("/chat")
