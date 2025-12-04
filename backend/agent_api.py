@@ -4,6 +4,7 @@ Simple React-style agent that queries a human via API.
 """
 import os
 import httpx
+import threading
 from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,11 +23,15 @@ app = FastAPI(title="Agent API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-memory storage for pending callbacks
+# query_id -> asyncio.Event and response data
+pending_callbacks: dict = {}
 
 # Initialize Gemini LLM
 llm = ChatGoogleGenerativeAI(
@@ -42,24 +47,57 @@ print("🤖 Agent initialized with Gemini 2.5 Flash")
 def query_human(question: str) -> str:
     """Ask a human for information. Use this when you need human input or clarification."""
     human_api_url = os.getenv("HUMAN_API_URL", "http://localhost:8001")
+    agent_api_url = os.getenv("AGENT_API_URL", "http://localhost:8000")
+    timeout_seconds = 300  # 5 minutes
 
     print(f"\n🔧 TOOL CALLED: query_human")
     print(f"   Question: {question}")
 
     try:
+        # Step 1: Submit query to Human API with callback URL
         with httpx.Client(timeout=30.0) as client:
             response = client.post(
                 f"{human_api_url}/query",
-                json={"question": question, "context": None}
+                json={
+                    "question": question,
+                    "context": None,
+                    "callback_url": f"{agent_api_url}/callback"
+                }
             )
             response.raise_for_status()
             data = response.json()
-            result = data["response"]
-            print(f"   Response: {result}\n")
-            return result
-    except httpx.HTTPError as e:
+            query_id = data["query_id"]
+
+        print(f"   Query ID: {query_id}")
+        print(f"   ⏳ Waiting for human response (via callback)...")
+
+        # Step 2: Create threading event and wait for callback
+        event = threading.Event()
+        pending_callbacks[query_id] = {
+            "event": event,
+            "response": None
+        }
+
+        # Wait for callback with timeout
+        received = event.wait(timeout=timeout_seconds)
+
+        if not received:
+            timeout_msg = f"Timeout: Human did not respond within {timeout_seconds} seconds"
+            print(f"   ⏰ {timeout_msg}\n")
+            pending_callbacks.pop(query_id, None)
+            return timeout_msg
+
+        # Get response
+        result = pending_callbacks[query_id]["response"]
+        pending_callbacks.pop(query_id, None)
+
+        print(f"   ✅ Response received: {result}\n")
+        return result
+
+    except Exception as e:
         error_msg = f"Error querying human: {str(e)}"
-        print(f"   Error: {error_msg}\n")
+        print(f"   ❌ Error: {error_msg}\n")
+        pending_callbacks.pop(query_id, None) if 'query_id' in locals() else None
         return error_msg
 
 
@@ -163,6 +201,34 @@ async def suggest_followups(request: ChatRequest):
         "What else should I know?",
     ]
     return SuggestionResponse(suggestions=suggestions)
+
+
+class CallbackRequest(BaseModel):
+    query_id: str
+    response: str
+
+
+@app.post("/callback")
+async def receive_callback(callback: CallbackRequest):
+    """
+    Callback endpoint for Human API to send responses.
+    Wakes up the waiting query_human tool.
+    """
+    query_id = callback.query_id
+    response = callback.response
+
+    print(f"\n📞 CALLBACK RECEIVED")
+    print(f"   Query ID: {query_id}")
+    print(f"   Response: {response}\n")
+
+    if query_id in pending_callbacks:
+        # Store response and set event to wake up waiting tool
+        pending_callbacks[query_id]["response"] = response
+        pending_callbacks[query_id]["event"].set()
+        return {"message": "Callback received successfully"}
+    else:
+        print(f"   ⚠️  Warning: Query ID not found in pending callbacks")
+        return {"message": "Query ID not found or already completed"}
 
 
 @app.get("/ping")
