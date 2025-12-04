@@ -165,10 +165,21 @@ async def generate_streaming_response(history: List[Message]):
 
         print(f"\n💬 User: {last_user_message}")
 
+        # Track if we've already shown the waiting message
+        shown_waiting_message = False
+
         # Run agent and stream response
         async for chunk in agent_executor.astream({"input": last_user_message}):
+            # Stream tool actions (when agent decides to use a tool)
+            if "actions" in chunk and not shown_waiting_message:
+                for action in chunk["actions"]:
+                    if action.tool == "query_human":
+                        yield "\n\n🤔 Asking human for help... please wait for their response.\n\n"
+                        shown_waiting_message = True
+                        break
+
             # Stream final output
-            if "output" in chunk:
+            elif "output" in chunk:
                 yield chunk["output"]
 
     except Exception as e:
