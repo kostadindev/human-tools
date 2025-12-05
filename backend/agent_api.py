@@ -3,6 +3,7 @@ Agent API Server
 Simple React-style agent that queries a human via API.
 """
 import os
+import uuid
 import httpx
 import threading
 from typing import List
@@ -109,7 +110,10 @@ template = """Answer the following questions as best you can. You have access to
 
 {tools}
 
-IMPORTANT: Only use tools if you truly need them. If you can answer the question directly, do so immediately without using any tools.
+IMPORTANT:
+- Only use tools if you truly need them. If you can answer the question directly, do so immediately without using any tools.
+- After receiving a response from a tool, ALWAYS process it and provide a complete, natural answer to the user.
+- Do NOT just repeat the tool's output. Use it to formulate a helpful response.
 
 Use the following format:
 
@@ -120,7 +124,7 @@ Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
-Final Answer: the final answer to the original input question
+Final Answer: the final answer to the original input question (provide a complete, natural response)
 
 Begin!
 
@@ -167,6 +171,7 @@ async def generate_streaming_response(history: List[Message]):
 
         # Track if we've already shown the waiting message
         shown_waiting_message = False
+        human_response_received = False
 
         # Run agent and stream response
         async for chunk in agent_executor.astream({"input": last_user_message}):
@@ -174,12 +179,17 @@ async def generate_streaming_response(history: List[Message]):
             if "actions" in chunk and not shown_waiting_message:
                 for action in chunk["actions"]:
                     if action.tool == "query_human":
-                        yield "\n\n🤔 Asking human for help... please wait for their response.\n\n"
+                        yield "🤔 Asking human for help... please wait for their response."
                         shown_waiting_message = True
                         break
 
+            # When tool completes and we have steps
+            if "steps" in chunk and shown_waiting_message and not human_response_received:
+                yield "\n\n✅ Response received! Processing...\n\n"
+                human_response_received = True
+
             # Stream final output
-            elif "output" in chunk:
+            if "output" in chunk:
                 yield chunk["output"]
 
     except Exception as e:
@@ -193,10 +203,18 @@ async def chat(request: ChatRequest):
     """
     Chat with the agent. The agent has access to tools including querying a human.
     Streams the response back to the client.
+    Each request is handled independently and won't block other requests.
     """
+    request_id = str(uuid.uuid4())[:8]
+    print(f"\n🆕 New chat request: {request_id}")
+
     return StreamingResponse(
         generate_streaming_response(request.history),
-        media_type="text/plain"
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Request-ID": request_id
+        }
     )
 
 
