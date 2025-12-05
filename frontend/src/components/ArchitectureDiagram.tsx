@@ -88,6 +88,7 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
       fitView
       attributionPosition="bottom-left"
       className={isDarkMode ? 'dark' : ''}
+      style={{ background: isDarkMode ? '#1a1a1a' : '#f7f9fb' }}
     >
       <Background color={isDarkMode ? '#444' : '#ddd'} />
     </ReactFlow>

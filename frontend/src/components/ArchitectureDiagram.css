@@ -24,11 +24,13 @@
 }
 
 .react-flow.dark {
+  --xy-background-color: #1a1a1a;
   --xy-node-boxshadow-default:
     0px 3.54px 4.55px 0px rgba(255, 255, 255, 0.05),
     /* light shadow */ 0px 3.54px 4.55px 0px rgba(255, 255, 255, 0.13),
     /* medium shadow */ 0px 0.51px 1.01px 0px rgba(255, 255, 255, 0.2); /* smallest shadow */
   --xy-theme-color-focus: #535353;
+  --xy-node-border-default: 1px solid #444444;
 }
 
 /* Customizing Default Theming */
@@ -271,4 +273,8 @@
 
 .react-flow__edge-textbg {
   fill: #f7f9fb;
+}
+
+.react-flow.dark .react-flow__edge-textbg {
+  fill: #1a1a1a;
 }

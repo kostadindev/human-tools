@@ -46,7 +46,7 @@ I'm here to chat about my work and expertise. Feel free to ask me about:
 Try one of the suggested prompts below or ask me anything!
   `.trim(),
   features: {
-    enableParticles: false,
+    enableParticles: true,
     enableHexagons: true,
   }
 } as const satisfies Config;
