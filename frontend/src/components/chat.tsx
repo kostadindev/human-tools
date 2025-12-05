@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
-import { Button, Input, Layout, theme } from "antd";
+import { Button, Input, Layout, theme, Tabs } from "antd";
 import { SendOutlined, ReloadOutlined } from "@ant-design/icons";
 import { DarkModeSwitch } from "react-toggle-dark-mode";
 import { useChat } from "../hooks/useChat";
 import { MessageList } from "./MessageList";
 import { Suggestions } from "./Suggestions";
+import ArchitectureDiagram from "./ArchitectureDiagram";
 import { Particles, initParticlesEngine } from "@tsparticles/react";
 import type { Engine } from "@tsparticles/engine";
 import { loadSlim } from "@tsparticles/slim";
@@ -131,7 +132,7 @@ const ChatComponent: React.FC = () => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !isSending) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
     }
@@ -216,109 +217,127 @@ const ChatComponent: React.FC = () => {
           style={{ minHeight: 0 }}
         >
           <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
-            <div
-              className="flex-1 transition-shadow duration-200 shadow-sm lg:shadow-md"
-              style={{
-                backgroundColor: token.colorBgContainer,
-                border: `1px solid ${token.colorBorder}`,
-                borderRadius: token.borderRadius,
-                position: "relative",
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-                height: "100%",
-              }}
-            >
-              <div
-                style={{
-                  position: "relative",
-                  zIndex: 1,
-                  backgroundColor: "transparent",
-                  display: "flex",
-                  flexDirection: "column",
-                  flex: 1,
-                  overflow: "auto",
-                  minHeight: 0,
-                  height: "100%",
-                }}
-              >
-                <MessageList
-                  messages={messages}
-                  isDarkMode={isDarkMode}
-                  onPromptSelect={sendMessage}
-                  onScroll={() => {}}
-                  isTyping={isTyping}
-                  onMessagesLoad={onMessagesLoad}
-                  chatDescription={UI_CONFIG.chatDescription}
-                />
-              </div>
-              {UI_CONFIG?.features?.enableHexagons && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: token.colorBorder,
-                    opacity: 0.12,
-                    pointerEvents: "none",
-                    zIndex: 0,
-                    maskImage: `url("data:image/svg+xml,%3Csvg width='104' height='240' viewBox='0 0 104 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='52,8 100,40 100,200 52,232 4,200 4,40' fill='none' stroke='%23000' stroke-width='4'/%3E%3C/svg%3E")`,
-                    WebkitMaskImage: `url("data:image/svg+xml,%3Csvg width='104' height='240' viewBox='0 0 104 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='52,8 100,40 100,200 52,232 4,200 4,40' fill='none' stroke='%23000' stroke-width='4'/%3E%3C/svg%3E")`,
-                    maskSize: "104px 240px",
-                    WebkitMaskSize: "104px 240px",
-                    maskRepeat: "repeat",
-                    WebkitMaskRepeat: "repeat",
-                    maskPosition: "0 0",
-                    WebkitMaskPosition: "0 0",
-                  }}
-                />
-              )}
-            </div>
+            <Tabs
+              defaultActiveKey="chat"
+              items={[
+                {
+                  key: "chat",
+                  label: "Chat",
+                  children: (
+                    <div className="flex flex-col" style={{ height: "calc(100vh - 180px)" }}>
+                      <div
+                        className="flex-1 transition-shadow duration-200 shadow-sm lg:shadow-md"
+                        style={{
+                          backgroundColor: token.colorBgContainer,
+                          border: `1px solid ${token.colorBorder}`,
+                          borderRadius: token.borderRadius,
+                          position: "relative",
+                          minHeight: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: "relative",
+                            zIndex: 1,
+                            backgroundColor: "transparent",
+                            display: "flex",
+                            flexDirection: "column",
+                            flex: 1,
+                            overflow: "auto",
+                            minHeight: 0,
+                          }}
+                        >
+                          <MessageList
+                            messages={messages}
+                            isDarkMode={isDarkMode}
+                            onPromptSelect={sendMessage}
+                            onScroll={() => {}}
+                            isTyping={isTyping}
+                            onMessagesLoad={onMessagesLoad}
+                            chatDescription={UI_CONFIG.chatDescription}
+                          />
+                        </div>
+                        {UI_CONFIG?.features?.enableHexagons && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              background: token.colorBorder,
+                              opacity: 0.12,
+                              pointerEvents: "none",
+                              zIndex: 0,
+                              maskImage: `url("data:image/svg+xml,%3Csvg width='104' height='240' viewBox='0 0 104 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='52,8 100,40 100,200 52,232 4,200 4,40' fill='none' stroke='%23000' stroke-width='4'/%3E%3C/svg%3E")`,
+                              WebkitMaskImage: `url("data:image/svg+xml,%3Csvg width='104' height='240' viewBox='0 0 104 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='52,8 100,40 100,200 52,232 4,200 4,40' fill='none' stroke='%23000' stroke-width='4'/%3E%3C/svg%3E")`,
+                              maskSize: "104px 240px",
+                              WebkitMaskSize: "104px 240px",
+                              maskRepeat: "repeat",
+                              WebkitMaskRepeat: "repeat",
+                              maskPosition: "0 0",
+                              WebkitMaskPosition: "0 0",
+                            }}
+                          />
+                        )}
+                      </div>
 
-            <div
-              className="sticky bottom-0 w-full z-20"
-              style={{ backgroundColor: token.colorBgLayout }}
-            >
-              <Suggestions
-                suggestions={suggestions}
-                isDarkMode={isDarkMode}
-                onSuggestionClick={sendMessage}
-              />
+                      <div
+                        className="w-full"
+                        style={{ backgroundColor: token.colorBgLayout }}
+                      >
+                        <Suggestions
+                          suggestions={suggestions}
+                          isDarkMode={isDarkMode}
+                          onSuggestionClick={sendMessage}
+                        />
 
-              <div className="w-full">
-                <div
-                  className="p-2 pr-4 border-t flex items-center gap-3"
-                  style={{
-                    backgroundColor: token.colorBgContainer,
-                    borderColor: token.colorBorder,
-                  }}
-                >
-                  <Input.TextArea
-                    autoSize
-                    value={input}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyPress}
-                    placeholder={
-                      UI_CONFIG.inputPlaceholder ?? DEFAULT_INPUT_PLACEHOLDER
-                    }
-                    style={{ fontSize: "16px" }}
-                    maxLength={
-                      UI_CONFIG.maxInputLength ?? DEFAULT_MAX_INPUT_LENGTH
-                    }
-                    disabled={isSending}
-                    className="flex-1"
-                  />
-                  <Button
-                    icon={<SendOutlined />}
-                    onClick={() => sendMessage(input)}
-                    disabled={isSending}
-                  />
-                </div>
-              </div>
-            </div>
+                        <div className="w-full">
+                          <div
+                            className="p-2 pr-4 border-t flex items-center gap-3"
+                            style={{
+                              backgroundColor: token.colorBgContainer,
+                              borderColor: token.colorBorder,
+                            }}
+                          >
+                            <Input.TextArea
+                              autoSize
+                              value={input}
+                              onChange={handleInputChange}
+                              onKeyDown={handleKeyPress}
+                              placeholder={
+                                UI_CONFIG.inputPlaceholder ?? DEFAULT_INPUT_PLACEHOLDER
+                              }
+                              style={{ fontSize: "16px" }}
+                              maxLength={
+                                UI_CONFIG.maxInputLength ?? DEFAULT_MAX_INPUT_LENGTH
+                              }
+                              className="flex-1"
+                            />
+                            <Button
+                              icon={<SendOutlined />}
+                              onClick={() => sendMessage(input)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: "architecture",
+                  label: "Architecture",
+                  children: (
+                    <div style={{ height: "calc(100vh - 180px)", overflow: "auto" }}>
+                      <ArchitectureDiagram isDarkMode={isDarkMode} />
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </div>
         </div>
       </div>
