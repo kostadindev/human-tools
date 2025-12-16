@@ -98,6 +98,12 @@ const ChatComponent: React.FC = () => {
   );
   const [init, setInit] = useState(false);
 
+  // Get initial tab from URL or default to "chat"
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") || "chat";
+  });
+
   useEffect(() => {
     if (UI_CONFIG?.features?.enableParticles) {
       initParticlesEngine(async (engine: Engine) => {
@@ -108,11 +114,22 @@ const ChatComponent: React.FC = () => {
     }
   }, []);
 
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tabFromUrl = params.get("tab") || "chat";
+      setActiveTab(tabFromUrl);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const {
     messages,
     input,
     setInput,
-    isSending,
     isTyping,
     suggestions,
     clearChat,
@@ -125,6 +142,14 @@ const ChatComponent: React.FC = () => {
     const newTheme = checked ? "dark" : "light";
     localStorage.setItem("theme", newTheme);
     window.dispatchEvent(new Event("themeChanged"));
+  };
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    // Update URL without reloading the page
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", key);
+    window.history.pushState({}, "", url.toString());
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -218,7 +243,8 @@ const ChatComponent: React.FC = () => {
         >
           <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
             <Tabs
-              defaultActiveKey="chat"
+              activeKey={activeTab}
+              onChange={handleTabChange}
               items={[
                 {
                   key: "chat",
@@ -328,7 +354,7 @@ const ChatComponent: React.FC = () => {
                   ),
                 },
                 {
-                  key: "architecture",
+                  key: "diagram",
                   label: "Diagram",
                   children: (
                     <div style={{ height: "calc(100vh - 180px)", overflow: "auto" }}>

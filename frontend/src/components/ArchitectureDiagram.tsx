@@ -174,7 +174,7 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
           onClick={resetDiagram}
           danger
         >
-          Reset Diagram
+          Reset
         </Button>
       </div>
 

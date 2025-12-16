@@ -245,14 +245,14 @@ human-tools/
 ### Basic Workflow
 
 1. **Design Your Agent Workflow:**
-   - Click "Diagram" tab
+   - Click "Diagram" tab (or visit `?tab=diagram`)
    - See the default: Orchestrator → Agent 1, Agent 2, Human
    - Drag nodes to rearrange
    - Drag from node handles to create new connections
    - Remove connections by selecting edge and pressing Delete
 
 2. **Chat with Your System:**
-   - Click "Agent" tab
+   - Click "Agent" tab (or visit `?tab=chat`)
    - Type your question
    - The orchestrator will use only the agents/tools connected in your diagram
 
@@ -519,6 +519,21 @@ Or:
 ```
 ⚠️  Agent tried to use unavailable tool: query_human
 ```
+
+## Tab State in URL
+
+The selected tab (Agent or Diagram) is stored in the URL:
+
+- **URL Format:** `http://localhost:5173/?tab=chat` or `?tab=diagram`
+- **Shareable:** Share URLs that open directly to specific tabs
+- **Bookmarkable:** Bookmark your preferred tab
+- **Browser Navigation:** Back/forward buttons work with tab changes
+
+**Location:** `frontend/src/components/chat.tsx:102-142`
+
+Examples:
+- Direct link to chat: `http://localhost:5173/?tab=chat`
+- Direct link to diagram: `http://localhost:5173/?tab=diagram`
 
 ## Diagram Persistence
 
