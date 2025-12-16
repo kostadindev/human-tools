@@ -252,24 +252,34 @@ tools = [analytical_agent, creative_agent, query_human]
 # Orchestrator prompt template
 template = """You are an orchestrator agent coordinating a team of specialized agents and a human collaborator.
 
-You have access to the following tools:
+AVAILABLE TOOLS - You can ONLY use these tools (no others):
 
 {tools}
 
-IMPORTANT Guidelines:
+Your available tools are ONLY: [{tool_names}]
+
+Tool Descriptions:
 - analytical_agent: Use for tasks requiring logical reasoning, data analysis, evaluation, or structured thinking
 - creative_agent: Use for tasks requiring brainstorming, ideation, storytelling, or innovative solutions
 - query_human: Use when you need human judgment, preferences, approval, or information only a human would know
-- You can use multiple tools in sequence if needed
-- Only use tools when necessary - if you can answer directly, do so
-- After receiving responses from tools, synthesize them into a coherent final answer
-- Do NOT just repeat tool outputs - provide a natural, complete response to the user
+
+CRITICAL RULES:
+1. ONLY use tools from [{tool_names}] - no other tools exist for you
+2. If the user asks you to use a tool that is NOT in your available tools list:
+   - Simply state: "I cannot do that because [tool_name] is not available in the current configuration."
+   - List what tools you DO have available: [{tool_names}]
+   - Do NOT try to work around it or use the unavailable tool
+   - Provide your Final Answer immediately explaining the limitation
+3. If you can answer the user's question directly without any tools, do so
+4. You can use multiple available tools in sequence if needed
+5. After getting responses from tools, synthesize them into a complete answer
+6. ALWAYS provide a Final Answer - never leave without responding
 
 Use the following format:
 
 Question: the input question you must answer
-Thought: think about what approach to take (direct answer or which tool(s) to use)
-Action: the action to take, should be one of [{tool_names}]
+Thought: think about what approach to take (direct answer or which available tool(s) to use)
+Action: the action to take, MUST be one of [{tool_names}]
 Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
@@ -328,12 +338,26 @@ async def generate_streaming_response(history: List[Message], diagram: Optional[
 
         print(f"\n💬 User: {last_user_message}")
 
-        if diagram:
-            print(f"📊 Diagram: {len(diagram.nodes)} nodes, {len(diagram.edges)} edges")
-            print(f"   Orchestrator connected to: {[node.label for node in diagram.nodes if node.type in ['agent', 'human']]}")
-
         # Get tools based on diagram structure (ENFORCES DIAGRAM)
         active_tools = get_tools_from_diagram(diagram)
+        active_tool_names = {tool.name for tool in active_tools}
+
+        if diagram:
+            # Find orchestrator and what it's connected to
+            orchestrator_id = None
+            for node in diagram.nodes:
+                if node.type == 'orchestrator':
+                    orchestrator_id = node.id
+                    break
+
+            connected_labels = []
+            if orchestrator_id:
+                connected_ids = {edge.target for edge in diagram.edges if edge.source == orchestrator_id}
+                connected_labels = [node.label for node in diagram.nodes if node.id in connected_ids]
+
+            print(f"📊 Diagram: {len(diagram.nodes)} nodes, {len(diagram.edges)} edges")
+            print(f"   Orchestrator ACTUALLY connected to: {connected_labels}")
+            print(f"   Available tools: {list(active_tool_names)}")
 
         # Create dynamic agent executor with diagram-filtered tools
         orchestrator_agent = create_react_agent(orchestrator_llm, active_tools, prompt)
@@ -341,22 +365,36 @@ async def generate_streaming_response(history: List[Message], diagram: Optional[
             agent=orchestrator_agent,
             tools=active_tools,
             verbose=True,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            max_iterations=15,
+            early_stopping_method="force"
         )
 
-        # Track tool calls
-        tool_messages = {
+        # Track tool calls - ONLY for available tools
+        all_tool_messages = {
             "query_human": "🤔 Asking human for help... please wait for their response.",
             "analytical_agent": "🔬 Consulting analytical agent...",
             "creative_agent": "🎨 Consulting creative agent..."
         }
+        # Filter to only show messages for available tools
+        tool_messages = {
+            tool_name: msg
+            for tool_name, msg in all_tool_messages.items()
+            if tool_name in active_tool_names
+        }
         shown_tool_messages = set()
 
         # Run orchestrator and stream response
+        response_generated = False
         async for chunk in executor.astream({"input": last_user_message}):
             # Stream tool actions (when orchestrator decides to use a tool)
             if "actions" in chunk:
                 for action in chunk["actions"]:
+                    # Validate tool is available
+                    if action.tool not in active_tool_names:
+                        print(f"⚠️  Agent tried to use unavailable tool: {action.tool}")
+                        continue
+
                     if action.tool in tool_messages and action.tool not in shown_tool_messages:
                         yield tool_messages[action.tool]
                         shown_tool_messages.add(action.tool)
@@ -371,11 +409,27 @@ async def generate_streaming_response(history: List[Message], diagram: Optional[
             # Stream final output
             if "output" in chunk:
                 yield chunk["output"]
+                response_generated = True
+
+        # If no response was generated, provide a helpful fallback
+        if not response_generated:
+            fallback_msg = "I apologize, but I'm having difficulty processing your request. "
+            if diagram and active_tools:
+                available_names = [t.name.replace('_', ' ') for t in active_tools]
+                fallback_msg += f"I currently have access to: {', '.join(available_names)}. "
+            fallback_msg += "Could you please rephrase your question?"
+            yield fallback_msg
 
     except Exception as e:
         error_msg = f"Error: {str(e)}"
         print(f"❌ {error_msg}")
-        yield error_msg
+        # Provide a user-friendly error message
+        yield f"I encountered an error while processing your request. "
+        if "No generation chunks" in str(e) or "Invalid Format" in str(e):
+            yield f"My available capabilities are: {', '.join([t.name.replace('_', ' ') for t in active_tools])}. "
+            yield f"Could you please rephrase your question to align with these capabilities?"
+        else:
+            yield f"Error details: {error_msg}"
 
 
 @app.post("/chat")
