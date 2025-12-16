@@ -119,7 +119,7 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div style={{
+      {/* <div style={{
         position: 'absolute',
         top: 10,
         right: 10,
@@ -140,7 +140,7 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
         >
           Add Tool
         </Button>
-      </div>
+      </div> */}
 
       <ReactFlow
         nodes={nodes}
