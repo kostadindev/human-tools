@@ -1,4 +1,4 @@
-# Human Tools - LLM Agent with Human Query API
+# Tailor - LLM Agent with Human Query API
 
 Async callback system where an AI agent can query a human and wait for responses.
 

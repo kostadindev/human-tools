@@ -1,5 +1,5 @@
 export const UI_CONFIG = {
-  name: "Human Tools",
+  name: "Tailor",
   inputPlaceholder: "Ask anything..",
   maxInputLength: 256,
   defaultPrompts: [
@@ -9,7 +9,7 @@ export const UI_CONFIG = {
     "Explain Deep Gestures",
   ],
   chatDescription: `
-# Hi! I'm Human Tools @spin[🤖]
+# Hi! I'm Tailor @spin[🤖]
 
 I'm here to chat about my work and expertise. Feel free to ask me about:
 
