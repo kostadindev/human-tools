@@ -222,7 +222,7 @@ const ChatComponent: React.FC = () => {
               items={[
                 {
                   key: "chat",
-                  label: "Chat",
+                  label: "Agent",
                   children: (
                     <div className="flex flex-col" style={{ height: "calc(100vh - 180px)" }}>
                       <div
@@ -329,7 +329,7 @@ const ChatComponent: React.FC = () => {
                 },
                 {
                   key: "architecture",
-                  label: "Architecture",
+                  label: "Diagram",
                   children: (
                     <div style={{ height: "calc(100vh - 180px)", overflow: "auto" }}>
                       <ArchitectureDiagram isDarkMode={isDarkMode} />
