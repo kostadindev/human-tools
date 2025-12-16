@@ -33,7 +33,7 @@ const initialNodes: Node[] = [
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     type: 'default',
-    data: { label: '🤖 Agent 1', nodeType: 'agent' },
+    data: { label: '🔬 Analytical', nodeType: 'agent' },
     position: { x: 300, y: 0 },
   },
   {
@@ -41,7 +41,7 @@ const initialNodes: Node[] = [
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     type: 'default',
-    data: { label: '🤖 Agent 2', nodeType: 'agent' },
+    data: { label: '🎨 Creative', nodeType: 'agent' },
     position: { x: 300, y: 80 },
   },
   {

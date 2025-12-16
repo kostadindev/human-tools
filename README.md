@@ -58,8 +58,8 @@ The visual diagram defines the agent workflow:
 {
   nodes: [
     { id: "orchestrator", type: "orchestrator", label: "🎯 Orchestrator" },
-    { id: "agent-1", type: "agent", label: "🤖 Agent 1" },
-    { id: "agent-2", type: "agent", label: "🤖 Agent 2" },
+    { id: "agent-1", type: "agent", label: "🔬 Analytical" },
+    { id: "agent-2", type: "agent", label: "🎨 Creative" },
     { id: "human", type: "human", label: "👤 Human" }
   ],
   edges: [
@@ -246,7 +246,7 @@ human-tools/
 
 1. **Design Your Agent Workflow:**
    - Click "Diagram" tab (or visit `?tab=diagram`)
-   - See the default: Orchestrator → Agent 1, Agent 2, Human
+   - See the default: Orchestrator → Analytical, Creative, Human
    - Drag nodes to rearrange
    - Drag from node handles to create new connections
    - Remove connections by selecting edge and pressing Delete
@@ -264,8 +264,8 @@ human-tools/
    - Your changes are automatically saved!
 
 4. **Reset to Default:**
-   - If you want to start over, click "Reset Diagram" button in the diagram tab
-   - This restores the original: Orchestrator → Agent 1, Agent 2, Human
+   - If you want to start over, click "Reset" button in the diagram tab
+   - This restores the original: Orchestrator → Analytical, Creative, Human
 
 ### Example Use Cases
 
@@ -510,7 +510,7 @@ Or:
 🆕 New chat request: abc123
 💬 User: Hello
 📊 Diagram: 4 nodes, 3 edges
-   Orchestrator ACTUALLY connected to: ['🤖 Agent 1', '🤖 Agent 2', '👤 Human']
+   Orchestrator ACTUALLY connected to: ['🔬 Analytical', '🎨 Creative', '👤 Human']
    Available tools: ['analytical_agent', 'creative_agent', 'query_human']
 🔧 Tools enabled from diagram: ['analytical_agent', 'creative_agent', 'query_human']
 ```
@@ -541,7 +541,7 @@ Diagram configurations are automatically saved to browser localStorage:
 
 - **Auto-save:** Every change to nodes or edges is saved immediately
 - **Auto-restore:** When you reload the page, your last diagram is restored
-- **Reset:** Click "Reset Diagram" button to restore default configuration
+- **Reset:** Click "Reset" button to restore default configuration
 - **Storage Key:** `diagram_state` in localStorage
 
 **Location:** `frontend/src/components/ArchitectureDiagram.tsx:83-127`
