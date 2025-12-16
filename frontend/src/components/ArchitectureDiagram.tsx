@@ -80,15 +80,51 @@ const initialEdges = [
 
 let nodeId = 4;
 
+const DIAGRAM_STORAGE_KEY = 'diagram_state';
+
+// Load saved diagram from localStorage or use initial values
+const loadSavedDiagram = () => {
+  try {
+    const saved = localStorage.getItem(DIAGRAM_STORAGE_KEY);
+    if (saved) {
+      const { nodes, edges } = JSON.parse(saved);
+      // Update nodeId to be higher than any existing node
+      const maxId = nodes.reduce((max: number, node: Node) => {
+        const match = node.id.match(/\d+$/);
+        if (match) {
+          const id = parseInt(match[0], 10);
+          return Math.max(max, id);
+        }
+        return max;
+      }, 0);
+      nodeId = maxId + 1;
+      return { nodes, edges };
+    }
+  } catch (error) {
+    console.error('Error loading saved diagram:', error);
+  }
+  return { nodes: initialNodes, edges: initialEdges };
+};
+
 const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const savedDiagram = loadSavedDiagram();
+  const [nodes, setNodes, onNodesChange] = useNodesState(savedDiagram.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(savedDiagram.edges);
   const { updateDiagram } = useDiagram();
 
   // Update diagram context whenever nodes or edges change
   useEffect(() => {
     updateDiagram(nodes, edges);
   }, [nodes, edges, updateDiagram]);
+
+  // Save diagram to localStorage whenever nodes or edges change
+  useEffect(() => {
+    try {
+      localStorage.setItem(DIAGRAM_STORAGE_KEY, JSON.stringify({ nodes, edges }));
+    } catch (error) {
+      console.error('Error saving diagram to localStorage:', error);
+    }
+  }, [nodes, edges]);
 
   const onConnect = useCallback(
     (params: any) => setEdges((els) => addEdge({ ...params, type: 'smoothstep', animated: true }, els)),
@@ -117,9 +153,16 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
     setNodes((nds) => nds.concat(newNode));
   }, [setNodes]);
 
+  const resetDiagram = useCallback(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    nodeId = 4;
+    localStorage.removeItem(DIAGRAM_STORAGE_KEY);
+  }, [setNodes, setEdges]);
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* <div style={{
+      <div style={{
         position: 'absolute',
         top: 10,
         right: 10,
@@ -128,19 +171,12 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
         gap: '8px'
       }}>
         <Button
-          icon={<PlusOutlined />}
-          onClick={addAgentNode}
-          type="primary"
+          onClick={resetDiagram}
+          danger
         >
-          Add Agent
+          Reset Diagram
         </Button>
-        <Button
-          icon={<PlusOutlined />}
-          onClick={addToolNode}
-        >
-          Add Tool
-        </Button>
-      </div> */}
+      </div>
 
       <ReactFlow
         nodes={nodes}

@@ -258,9 +258,14 @@ human-tools/
 
 3. **Modify Workflow Dynamically:**
    - Switch to "Diagram" tab
-   - Remove Human node connection (delete edge)
+   - Remove Human node connection (delete edge by selecting it and pressing Delete)
    - Switch back to "Agent" tab
    - Now orchestrator can't access human - will only use AI agents
+   - Your changes are automatically saved!
+
+4. **Reset to Default:**
+   - If you want to start over, click "Reset Diagram" button in the diagram tab
+   - This restores the original: Orchestrator → Agent 1, Agent 2, Human
 
 ### Example Use Cases
 
@@ -515,9 +520,26 @@ Or:
 ⚠️  Agent tried to use unavailable tool: query_human
 ```
 
+## Diagram Persistence
+
+Diagram configurations are automatically saved to browser localStorage:
+
+- **Auto-save:** Every change to nodes or edges is saved immediately
+- **Auto-restore:** When you reload the page, your last diagram is restored
+- **Reset:** Click "Reset Diagram" button to restore default configuration
+- **Storage Key:** `diagram_state` in localStorage
+
+**Location:** `frontend/src/components/ArchitectureDiagram.tsx:83-127`
+
+To clear saved diagrams manually:
+```javascript
+localStorage.removeItem('diagram_state');
+```
+
 ## Future Enhancements
 
-- [ ] Persist diagram configurations
+- [ ] Multiple saved diagram configurations with names
+- [ ] Export/import diagram as JSON
 - [ ] User authentication and saved workflows
 - [ ] More specialized agents (code, math, research, etc.)
 - [ ] Agent execution history and metrics
