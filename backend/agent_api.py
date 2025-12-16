@@ -1,12 +1,12 @@
 """
 Agent API Server
-Simple React-style agent that queries a human via API.
+Multi-agent orchestration system with specialized AI agents and human-in-the-loop.
 """
 import os
 import uuid
 import httpx
 import threading
-from typing import List
+from typing import List, Dict, Any, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -34,14 +34,26 @@ app.add_middleware(
 # query_id -> asyncio.Event and response data
 pending_callbacks: dict = {}
 
-# Initialize Gemini LLM
-llm = ChatGoogleGenerativeAI(
+# Initialize LLMs for different agents
+orchestrator_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0.7,
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-print("🤖 Agent initialized with Gemini 2.5 Flash")
+agent_1_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.5,
+    google_api_key=os.getenv("GOOGLE_API_KEY")
+)
+
+agent_2_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.9,
+    google_api_key=os.getenv("GOOGLE_API_KEY")
+)
+
+print("🤖 Agents initialized with Gemini 2.5 Flash")
 
 
 @tool
@@ -102,29 +114,167 @@ def query_human(question: str) -> str:
         return error_msg
 
 
-# Tools available to the agent
-tools = [query_human]
+@tool
+def analytical_agent(task: str) -> str:
+    """
+    An analytical AI agent specialized in logical reasoning, data analysis, and structured thinking.
+    Use this agent for tasks requiring: analysis, comparison, evaluation, or logical problem-solving.
+    """
+    print(f"\n🔬 TOOL CALLED: analytical_agent")
+    print(f"   Task: {task}")
 
-# Simple React prompt template
-template = """Answer the following questions as best you can. You have access to the following tools:
+    try:
+        prompt = f"""You are an analytical AI agent specialized in logical reasoning and structured thinking.
+
+Task: {task}
+
+Provide a well-reasoned, analytical response. Focus on:
+- Breaking down complex problems
+- Logical step-by-step reasoning
+- Data-driven insights
+- Structured conclusions
+
+Response:"""
+
+        response = agent_1_llm.invoke(prompt)
+        result = response.content
+        print(f"   ✅ Analytical agent completed\n")
+        return result
+    except Exception as e:
+        error_msg = f"Error in analytical agent: {str(e)}"
+        print(f"   ❌ Error: {error_msg}\n")
+        return error_msg
+
+
+@tool
+def creative_agent(task: str) -> str:
+    """
+    A creative AI agent specialized in brainstorming, ideation, and creative problem-solving.
+    Use this agent for tasks requiring: creativity, idea generation, storytelling, or innovative solutions.
+    """
+    print(f"\n🎨 TOOL CALLED: creative_agent")
+    print(f"   Task: {task}")
+
+    try:
+        prompt = f"""You are a creative AI agent specialized in brainstorming and innovative thinking.
+
+Task: {task}
+
+Provide a creative, innovative response. Focus on:
+- Out-of-the-box thinking
+- Creative solutions and ideas
+- Multiple perspectives
+- Imaginative approaches
+
+Response:"""
+
+        response = agent_2_llm.invoke(prompt)
+        result = response.content
+        print(f"   ✅ Creative agent completed\n")
+        return result
+    except Exception as e:
+        error_msg = f"Error in creative agent: {str(e)}"
+        print(f"   ❌ Error: {error_msg}\n")
+        return error_msg
+
+
+# All available tools
+ALL_TOOLS = {
+    'agent': [analytical_agent, creative_agent],
+    'human': [query_human],
+}
+
+# Map node types to tool names
+TOOL_MAP = {
+    'agent': ['analytical_agent', 'creative_agent'],
+    'human': ['query_human'],
+}
+
+
+def get_tools_from_diagram(diagram: Optional[DiagramStructure]) -> List:
+    """
+    Parse diagram structure and return only the tools that the orchestrator is connected to.
+    This enforces the diagram architecture.
+    """
+    if not diagram:
+        # If no diagram provided, use all tools (backward compatibility)
+        return [analytical_agent, creative_agent, query_human]
+
+    # Find orchestrator node
+    orchestrator_id = None
+    for node in diagram.nodes:
+        if node.type == 'orchestrator':
+            orchestrator_id = node.id
+            break
+
+    if not orchestrator_id:
+        print("⚠️  No orchestrator found in diagram, using all tools")
+        return [analytical_agent, creative_agent, query_human]
+
+    # Find what the orchestrator is connected to
+    connected_node_ids = set()
+    for edge in diagram.edges:
+        if edge.source == orchestrator_id:
+            connected_node_ids.add(edge.target)
+
+    # Map connected nodes to tools
+    available_tools = []
+    tool_names = []
+
+    for node in diagram.nodes:
+        if node.id in connected_node_ids:
+            if node.type == 'agent':
+                available_tools.extend([analytical_agent, creative_agent])
+                tool_names.extend(['analytical_agent', 'creative_agent'])
+            elif node.type == 'human':
+                available_tools.append(query_human)
+                tool_names.append('query_human')
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_tools = []
+    for tool in available_tools:
+        if tool.name not in seen:
+            seen.add(tool.name)
+            unique_tools.append(tool)
+
+    if not unique_tools:
+        print("⚠️  No tools connected in diagram, using all tools as fallback")
+        return [analytical_agent, creative_agent, query_human]
+
+    print(f"🔧 Tools enabled from diagram: {[t.name for t in unique_tools]}")
+    return unique_tools
+
+
+# Default tools (will be overridden by diagram)
+tools = [analytical_agent, creative_agent, query_human]
+
+# Orchestrator prompt template
+template = """You are an orchestrator agent coordinating a team of specialized agents and a human collaborator.
+
+You have access to the following tools:
 
 {tools}
 
-IMPORTANT:
-- Only use tools if you truly need them. If you can answer the question directly, do so immediately without using any tools.
-- After receiving a response from a tool, ALWAYS process it and provide a complete, natural answer to the user.
-- Do NOT just repeat the tool's output. Use it to formulate a helpful response.
+IMPORTANT Guidelines:
+- analytical_agent: Use for tasks requiring logical reasoning, data analysis, evaluation, or structured thinking
+- creative_agent: Use for tasks requiring brainstorming, ideation, storytelling, or innovative solutions
+- query_human: Use when you need human judgment, preferences, approval, or information only a human would know
+- You can use multiple tools in sequence if needed
+- Only use tools when necessary - if you can answer directly, do so
+- After receiving responses from tools, synthesize them into a coherent final answer
+- Do NOT just repeat tool outputs - provide a natural, complete response to the user
 
 Use the following format:
 
 Question: the input question you must answer
-Thought: think about whether you can answer this directly or need to use a tool
-Action: the action to take, should be one of [{tool_names}] (ONLY if needed)
+Thought: think about what approach to take (direct answer or which tool(s) to use)
+Action: the action to take, should be one of [{tool_names}]
 Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
-Final Answer: the final answer to the original input question (provide a complete, natural response)
+Final Answer: the final answer synthesized from all information gathered
 
 Begin!
 
@@ -133,16 +283,7 @@ Thought:{agent_scratchpad}"""
 
 prompt = PromptTemplate.from_template(template)
 
-# Create React agent
-agent = create_react_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    handle_parsing_errors=True
-)
-
-print("✅ React agent created successfully\n")
+print("✅ Orchestrator system initialized\n")
 
 
 class Message(BaseModel):
@@ -150,16 +291,34 @@ class Message(BaseModel):
     content: str
 
 
+class DiagramNode(BaseModel):
+    id: str
+    type: str
+    label: str
+
+
+class DiagramEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+
+
+class DiagramStructure(BaseModel):
+    nodes: List[DiagramNode]
+    edges: List[DiagramEdge]
+
+
 class ChatRequest(BaseModel):
     history: List[Message]
+    diagram: Optional[DiagramStructure] = None
 
 
 class SuggestionResponse(BaseModel):
     suggestions: List[str]
 
 
-async def generate_streaming_response(history: List[Message]):
-    """Stream agent response to frontend"""
+async def generate_streaming_response(history: List[Message], diagram: Optional[DiagramStructure] = None):
+    """Stream orchestrator agent response to frontend"""
     try:
         # Get the last user message
         last_user_message = ""
@@ -169,24 +328,45 @@ async def generate_streaming_response(history: List[Message]):
 
         print(f"\n💬 User: {last_user_message}")
 
-        # Track if we've already shown the waiting message
-        shown_waiting_message = False
-        human_response_received = False
+        if diagram:
+            print(f"📊 Diagram: {len(diagram.nodes)} nodes, {len(diagram.edges)} edges")
+            print(f"   Orchestrator connected to: {[node.label for node in diagram.nodes if node.type in ['agent', 'human']]}")
 
-        # Run agent and stream response
-        async for chunk in agent_executor.astream({"input": last_user_message}):
-            # Stream tool actions (when agent decides to use a tool)
-            if "actions" in chunk and not shown_waiting_message:
+        # Get tools based on diagram structure (ENFORCES DIAGRAM)
+        active_tools = get_tools_from_diagram(diagram)
+
+        # Create dynamic agent executor with diagram-filtered tools
+        orchestrator_agent = create_react_agent(orchestrator_llm, active_tools, prompt)
+        executor = AgentExecutor(
+            agent=orchestrator_agent,
+            tools=active_tools,
+            verbose=True,
+            handle_parsing_errors=True
+        )
+
+        # Track tool calls
+        tool_messages = {
+            "query_human": "🤔 Asking human for help... please wait for their response.",
+            "analytical_agent": "🔬 Consulting analytical agent...",
+            "creative_agent": "🎨 Consulting creative agent..."
+        }
+        shown_tool_messages = set()
+
+        # Run orchestrator and stream response
+        async for chunk in executor.astream({"input": last_user_message}):
+            # Stream tool actions (when orchestrator decides to use a tool)
+            if "actions" in chunk:
                 for action in chunk["actions"]:
-                    if action.tool == "query_human":
-                        yield "🤔 Asking human for help... please wait for their response."
-                        shown_waiting_message = True
-                        break
+                    if action.tool in tool_messages and action.tool not in shown_tool_messages:
+                        yield tool_messages[action.tool]
+                        shown_tool_messages.add(action.tool)
 
-            # When tool completes and we have steps
-            if "steps" in chunk and shown_waiting_message and not human_response_received:
-                yield "\n\n✅ Response received! Processing...\n\n"
-                human_response_received = True
+            # When tool completes
+            if "steps" in chunk:
+                for step in chunk["steps"]:
+                    tool_name = step.action.tool
+                    if tool_name in shown_tool_messages:
+                        yield "\n\n✅ Response received! Processing...\n\n"
 
             # Stream final output
             if "output" in chunk:
@@ -201,7 +381,7 @@ async def generate_streaming_response(history: List[Message]):
 @app.post("/chat")
 async def chat(request: ChatRequest):
     """
-    Chat with the agent. The agent has access to tools including querying a human.
+    Chat with the orchestrator agent. The orchestrator coordinates specialized AI agents and human collaboration.
     Streams the response back to the client.
     Each request is handled independently and won't block other requests.
     """
@@ -209,7 +389,7 @@ async def chat(request: ChatRequest):
     print(f"\n🆕 New chat request: {request_id}")
 
     return StreamingResponse(
-        generate_streaming_response(request.history),
+        generate_streaming_response(request.history, request.diagram),
         media_type="text/plain",
         headers={
             "Cache-Control": "no-cache",
