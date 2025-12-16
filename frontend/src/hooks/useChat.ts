@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message } from '../types/chat';
 import { chatService } from '../services/chatService';
+import { useDiagram } from '../contexts/DiagramContext';
 
 const CHAT_HISTORY_KEY = "chat_history";
 
@@ -11,6 +12,7 @@ export const useChat = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const activeRequestsRef = useRef<Set<AbortController>>(new Set());
+  const { diagramStructure } = useDiagram();
 
   const handleMessagesLoad = useCallback((loadedMessages: Message[]) => {
     setMessages(loadedMessages);
@@ -46,7 +48,7 @@ export const useChat = () => {
     const assistantMessageIndex = newMessages.length;
 
     try {
-      const stream = await chatService.sendMessage(newMessages, controller.signal);
+      const stream = await chatService.sendMessage(newMessages, diagramStructure, controller.signal);
       if (!stream) return;
 
       // Add assistant message placeholder at the correct index
@@ -86,7 +88,7 @@ export const useChat = () => {
         return prev;
       });
 
-      const suggestions = await chatService.getSuggestions(currentMessages);
+      const suggestions = await chatService.getSuggestions(currentMessages, diagramStructure);
       setSuggestions(suggestions);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
@@ -106,7 +108,7 @@ export const useChat = () => {
       // Remove this controller from active requests
       activeRequestsRef.current.delete(controller);
     }
-  }, [messages]);
+  }, [messages, diagramStructure]);
 
   useEffect(() => {
     chatService.wakeUpServer();

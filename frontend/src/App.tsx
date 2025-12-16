@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Chat from "./components/chat";
 import { ConfigProvider, theme } from "antd";
+import { DiagramProvider } from "./contexts/DiagramContext";
 
 // Theme configuration constants
 const THEME_CONFIG = {
@@ -66,9 +67,11 @@ const App = () => {
         },
       }}
     >
-      <div className="App w-screen h-screen">
-        <Chat />
-      </div>
+      <DiagramProvider>
+        <div className="App w-screen h-screen">
+          <Chat />
+        </div>
+      </DiagramProvider>
     </ConfigProvider>
   );
 };

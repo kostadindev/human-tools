@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Background,
   ReactFlow,
@@ -14,6 +14,7 @@ import { Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import '@xyflow/react/dist/style.css';
 import './ArchitectureDiagram.css';
+import { useDiagram } from '../contexts/DiagramContext';
 
 interface ArchitectureDiagramProps {
   isDarkMode: boolean;
@@ -24,7 +25,7 @@ const initialNodes: Node[] = [
     id: 'orchestrator',
     sourcePosition: Position.Right,
     type: 'input',
-    data: { label: '🎯 Orchestrator' },
+    data: { label: '🎯 Orchestrator', nodeType: 'orchestrator' },
     position: { x: 0, y: 80 },
   },
   {
@@ -32,7 +33,7 @@ const initialNodes: Node[] = [
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     type: 'default',
-    data: { label: '🤖 Agent 1' },
+    data: { label: '🤖 Agent 1', nodeType: 'agent' },
     position: { x: 300, y: 0 },
   },
   {
@@ -40,15 +41,15 @@ const initialNodes: Node[] = [
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     type: 'default',
-    data: { label: '🤖 Agent 2' },
+    data: { label: '🤖 Agent 2', nodeType: 'agent' },
     position: { x: 300, y: 80 },
   },
   {
-    id: 'agent-3',
+    id: 'human',
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     type: 'default',
-    data: { label: '🤖 Agent 3' },
+    data: { label: '👤 Human', nodeType: 'human' },
     position: { x: 300, y: 160 },
   },
 ];
@@ -72,7 +73,7 @@ const initialEdges = [
     id: 'e3',
     source: 'orchestrator',
     type: 'smoothstep',
-    target: 'agent-3',
+    target: 'human',
     animated: true,
   },
 ];
@@ -82,6 +83,12 @@ let nodeId = 4;
 const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { updateDiagram } = useDiagram();
+
+  // Update diagram context whenever nodes or edges change
+  useEffect(() => {
+    updateDiagram(nodes, edges);
+  }, [nodes, edges, updateDiagram]);
 
   const onConnect = useCallback(
     (params: any) => setEdges((els) => addEdge({ ...params, type: 'smoothstep', animated: true }, els)),
@@ -93,7 +100,7 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
       id: `agent-${nodeId++}`,
       sourcePosition: Position.Right,
       type: 'input',
-      data: { label: '🤖 Agent' },
+      data: { label: '🤖 Agent', nodeType: 'agent' },
       position: { x: Math.random() * 400, y: Math.random() * 300 },
     };
     setNodes((nds) => nds.concat(newNode));
@@ -104,7 +111,7 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
       id: `tool-${nodeId++}`,
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      data: { label: '🔧 tool' },
+      data: { label: '🔧 tool', nodeType: 'tool' },
       position: { x: Math.random() * 400 + 300, y: Math.random() * 300 },
     };
     setNodes((nds) => nds.concat(newNode));
