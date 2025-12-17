@@ -10,7 +10,6 @@ export const useChat = () => {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const activeRequestsRef = useRef<Set<AbortController>>(new Set());
   const { diagramStructure } = useDiagram();
 
@@ -24,7 +23,6 @@ export const useChat = () => {
     activeRequestsRef.current.clear();
 
     setMessages([]);
-    setSuggestions([]);
     setIsSending(false);
     setIsTyping(false);
     localStorage.removeItem(CHAT_HISTORY_KEY);
@@ -38,7 +36,6 @@ export const useChat = () => {
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
-    setSuggestions([]);
 
     // Create a new controller for this request
     const controller = new AbortController();
@@ -84,18 +81,6 @@ export const useChat = () => {
 
       // Set typing indicator to false when response is complete
       setIsTyping(false);
-
-      // Get suggestions after this specific conversation completes
-      const currentMessages = [...newMessages];
-      setMessages((prev) => {
-        if (prev[assistantMessageIndex]) {
-          currentMessages.push(prev[assistantMessageIndex]);
-        }
-        return prev;
-      });
-
-      const suggestions = await chatService.getSuggestions(currentMessages, diagramStructure);
-      setSuggestions(suggestions);
     } catch (error) {
       // Set typing indicator to false on error
       setIsTyping(false);
@@ -129,7 +114,6 @@ export const useChat = () => {
     setInput,
     isSending,
     isTyping,
-    suggestions,
     clearChat,
     sendMessage,
     onMessagesLoad: handleMessagesLoad,
