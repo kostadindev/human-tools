@@ -58,6 +58,9 @@ export const useChat = () => {
         return updated;
       });
 
+      // Set typing indicator to true when starting to receive response
+      setIsTyping(true);
+
       const reader = stream.getReader();
       const decoder = new TextDecoder();
 
@@ -79,6 +82,9 @@ export const useChat = () => {
         });
       }
 
+      // Set typing indicator to false when response is complete
+      setIsTyping(false);
+
       // Get suggestions after this specific conversation completes
       const currentMessages = [...newMessages];
       setMessages((prev) => {
@@ -91,6 +97,9 @@ export const useChat = () => {
       const suggestions = await chatService.getSuggestions(currentMessages, diagramStructure);
       setSuggestions(suggestions);
     } catch (error) {
+      // Set typing indicator to false on error
+      setIsTyping(false);
+
       if (error instanceof Error && error.name === "AbortError") {
         console.log("Request was aborted");
       } else {

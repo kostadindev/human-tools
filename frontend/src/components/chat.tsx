@@ -315,11 +315,11 @@ const ChatComponent: React.FC = () => {
                         className="w-full"
                         style={{ backgroundColor: token.colorBgLayout }}
                       >
-                        <Suggestions
+                        {/* <Suggestions
                           suggestions={suggestions}
                           isDarkMode={isDarkMode}
                           onSuggestionClick={sendMessage}
-                        />
+                        /> */}
 
                         <div className="w-full">
                           <div
