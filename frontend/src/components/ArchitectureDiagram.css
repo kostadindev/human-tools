@@ -278,3 +278,51 @@
 .react-flow.dark .react-flow__edge-textbg {
   fill: #1a1a1a;
 }
+
+/* Agent Card Modal Styles */
+.dark-modal .ant-modal-content {
+  background-color: #1f1f1f;
+  color: #fff;
+}
+
+.dark-modal .ant-modal-header {
+  background-color: #1f1f1f;
+  border-bottom: 1px solid #444;
+}
+
+.dark-modal .ant-modal-title {
+  color: #fff;
+}
+
+.dark-modal .ant-modal-close {
+  color: #fff;
+}
+
+.dark-modal .ant-modal-close:hover {
+  color: #ccc;
+}
+
+.dark-modal .ant-card {
+  background-color: #1f1f1f;
+  border-color: #444;
+}
+
+.dark-modal .ant-card-head {
+  border-bottom: 1px solid #444;
+}
+
+.dark-modal .ant-card-head-title {
+  color: #fff;
+}
+
+.dark-modal .ant-typography {
+  color: #fff;
+}
+
+.dark-modal .ant-timeline-item-content {
+  color: #fff;
+}
+
+.dark-modal .ant-tag {
+  border-color: #444;
+}
