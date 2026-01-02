@@ -7,6 +7,7 @@ import uuid
 import httpx
 import threading
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -33,6 +34,14 @@ app.add_middleware(
 # In-memory storage for pending callbacks
 # query_id -> asyncio.Event and response data
 pending_callbacks: dict = {}
+
+# Task history storage
+# agent_id -> List[TaskHistory]
+task_history: Dict[str, List[Dict[str, Any]]] = {
+    'agent-1': [],  # Analytical agent
+    'agent-2': [],  # Creative agent
+    'human': [],    # Human agent
+}
 
 # Initialize LLMs for different agents
 orchestrator_llm = ChatGoogleGenerativeAI(
@@ -98,11 +107,28 @@ def query_human(question: str) -> str:
             timeout_msg = f"Timeout: Human did not respond within {timeout_seconds} seconds"
             print(f"   ⏰ {timeout_msg}\n")
             pending_callbacks.pop(query_id, None)
+            
+            # Record timeout in history
+            task_history['human'].append({
+                'id': str(uuid.uuid4()),
+                'timestamp': datetime.now().isoformat(),
+                'action': f"Timeout waiting for response: {question[:80]}{'...' if len(question) > 80 else ''}",
+                'status': 'error'
+            })
+            
             return timeout_msg
 
         # Get response
         result = pending_callbacks[query_id]["response"]
         pending_callbacks.pop(query_id, None)
+
+        # Record task history for human
+        task_history['human'].append({
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().isoformat(),
+            'action': f"Responded to query: {question[:80]}{'...' if len(question) > 80 else ''}",
+            'status': 'success'
+        })
 
         print(f"   ✅ Response received: {result}\n")
         return result
@@ -138,10 +164,28 @@ Response:"""
 
         response = agent_1_llm.invoke(prompt)
         result = response.content
+        
+        # Record task history
+        task_history['agent-1'].append({
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().isoformat(),
+            'action': task[:100] + ('...' if len(task) > 100 else ''),  # Truncate long tasks
+            'status': 'success'
+        })
+        
         print(f"   ✅ Analytical agent completed\n")
         return result
     except Exception as e:
         error_msg = f"Error in analytical agent: {str(e)}"
+        
+        # Record failed task
+        task_history['agent-1'].append({
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().isoformat(),
+            'action': task[:100] + ('...' if len(task) > 100 else ''),
+            'status': 'error'
+        })
+        
         print(f"   ❌ Error: {error_msg}\n")
         return error_msg
 
@@ -170,10 +214,28 @@ Response:"""
 
         response = agent_2_llm.invoke(prompt)
         result = response.content
+        
+        # Record task history
+        task_history['agent-2'].append({
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().isoformat(),
+            'action': task[:100] + ('...' if len(task) > 100 else ''),  # Truncate long tasks
+            'status': 'success'
+        })
+        
         print(f"   ✅ Creative agent completed\n")
         return result
     except Exception as e:
         error_msg = f"Error in creative agent: {str(e)}"
+        
+        # Record failed task
+        task_history['agent-2'].append({
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().isoformat(),
+            'action': task[:100] + ('...' if len(task) > 100 else ''),
+            'status': 'error'
+        })
+        
         print(f"   ❌ Error: {error_msg}\n")
         return error_msg
 
@@ -498,6 +560,21 @@ async def receive_callback(callback: CallbackRequest):
 async def ping():
     """Ping endpoint to wake up the server"""
     return {"status": "ok"}
+
+
+@app.get("/agent/{agent_id}/history")
+async def get_agent_history(agent_id: str):
+    """
+    Get task history for a specific agent or human.
+    Supported agent_ids: 'agent-1', 'agent-2', 'human'
+    """
+    if agent_id not in task_history:
+        return {"history": []}
+    
+    # Return history in reverse chronological order (newest first)
+    history = task_history[agent_id].copy()
+    history.reverse()
+    return {"history": history}
 
 
 @app.get("/health")
