@@ -101,79 +101,42 @@ interface AgentData {
   history: AgentHistory[];
 }
 
-const mockAgentData: Record<string, AgentData> = {
+// Agent metadata (static information about each agent/human)
+const agentMetadata: Record<string, Omit<AgentData, 'id' | 'history'>> = {
   'agent-1': {
-    id: 'agent-1',
     name: 'Analytical Agent',
     description: 'A specialized agent designed for data analysis, pattern recognition, and logical reasoning. This agent excels at breaking down complex problems into manageable components and providing data-driven insights.',
     type: 'Analytical',
     capabilities: ['Data Analysis', 'Pattern Recognition', 'Statistical Modeling', 'Report Generation'],
-    history: [
-      {
-        id: 'h1',
-        timestamp: '2024-01-15 10:30:00',
-        action: 'Analyzed user query patterns',
-        status: 'success',
-      },
-      {
-        id: 'h2',
-        timestamp: '2024-01-15 09:15:00',
-        action: 'Generated statistical report',
-        status: 'success',
-      },
-      {
-        id: 'h3',
-        timestamp: '2024-01-15 08:00:00',
-        action: 'Identified data anomalies',
-        status: 'success',
-      },
-      {
-        id: 'h4',
-        timestamp: '2024-01-14 16:45:00',
-        action: 'Failed to process large dataset',
-        status: 'error',
-      },
-      {
-        id: 'h5',
-        timestamp: '2024-01-14 14:20:00',
-        action: 'Completed trend analysis',
-        status: 'success',
-      },
-    ],
   },
   'agent-2': {
-    id: 'agent-2',
     name: 'Creative Agent',
     description: 'An innovative agent focused on creative problem-solving, content generation, and artistic expression. This agent brings creativity and out-of-the-box thinking to complex challenges.',
     type: 'Creative',
     capabilities: ['Content Generation', 'Creative Writing', 'Design Concepts', 'Brainstorming'],
-    history: [
-      {
-        id: 'h1',
-        timestamp: '2024-01-15 11:00:00',
-        action: 'Generated creative content proposal',
-        status: 'success',
-      },
-      {
-        id: 'h2',
-        timestamp: '2024-01-15 10:00:00',
-        action: 'Created design mockup',
-        status: 'success',
-      },
-      {
-        id: 'h3',
-        timestamp: '2024-01-15 09:30:00',
-        action: 'Brainstormed solution concepts',
-        status: 'success',
-      },
-      {
-        id: 'h4',
-        timestamp: '2024-01-14 17:00:00',
-        action: 'Content generation in progress',
-        status: 'pending',
-      },
-    ],
   },
+  'human': {
+    name: 'Human Collaborator',
+    description: 'A human collaborator who provides judgment, preferences, approval, and information that requires human insight. The human collaborator works asynchronously with the AI agents to provide critical input.',
+    type: 'Human',
+    capabilities: ['Decision Making', 'Judgment', 'Approval', 'Contextual Knowledge'],
+  },
+};
+
+// Fetch agent history from backend
+const fetchAgentHistory = async (agentId: string): Promise<AgentHistory[]> => {
+  try {
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    const response = await fetch(`${API_URL}/agent/${agentId}/history`);
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    return data.history || [];
+  } catch (error) {
+    console.error(`Error fetching history for ${agentId}:`, error);
+    return [];
+  }
 };
 
 // Load saved diagram from localStorage or use initial values
@@ -256,33 +219,68 @@ const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({ isDarkMode })
     localStorage.removeItem(DIAGRAM_STORAGE_KEY);
   }, [setNodes, setEdges]);
 
-  const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
-    // Only show agent card for agent nodes
-    if (node.data?.nodeType === 'agent') {
-      const agentData = mockAgentData[node.id];
-      if (agentData) {
-        setSelectedAgent(agentData);
-        setIsModalOpen(true);
-      } else {
-        // For dynamically added agents, create a default agent card
-        const defaultAgent: AgentData = {
-          id: node.id,
-          name: (typeof node.data?.label === 'string' ? node.data.label : 'Agent') || 'Agent',
-          description: 'A general-purpose agent capable of handling various tasks and coordinating with other agents in the system.',
-          type: 'General',
-          capabilities: ['Task Execution', 'Coordination', 'Communication'],
-          history: [
-            {
-              id: 'h1',
-              timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
-              action: 'Agent initialized',
-              status: 'success',
-            },
-          ],
+  const onNodeClick: NodeMouseHandler = useCallback(async (_event, node) => {
+    // Show agent card for agent and human nodes
+    if (node.data?.nodeType === 'agent' || node.data?.nodeType === 'human') {
+      setIsModalOpen(true);
+      
+      // Get metadata for this agent/human
+      const metadata = agentMetadata[node.id];
+      const defaultMetadata = {
+        name: (typeof node.data?.label === 'string' ? node.data.label : 'Agent') || 'Agent',
+        description: 'A general-purpose agent capable of handling various tasks and coordinating with other agents in the system.',
+        type: node.data?.nodeType === 'human' ? 'Human' : 'General',
+        capabilities: node.data?.nodeType === 'human' 
+          ? ['Decision Making', 'Judgment', 'Approval']
+          : ['Task Execution', 'Coordination', 'Communication'],
+      };
+      
+      const agentInfo = metadata || defaultMetadata;
+      
+      // Fetch history from backend
+      const history = await fetchAgentHistory(node.id);
+      
+      // Format timestamps for display
+      const formattedHistory: AgentHistory[] = history.map((item) => {
+        let formattedTimestamp = new Date().toLocaleString();
+        if (item.timestamp) {
+          try {
+            const date = new Date(item.timestamp);
+            if (!isNaN(date.getTime())) {
+              formattedTimestamp = date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              });
+            }
+          } catch (e) {
+            console.warn('Error parsing timestamp:', item.timestamp);
+          }
+        }
+        return {
+          ...item,
+          timestamp: formattedTimestamp,
+          status: (item.status || 'pending') as 'success' | 'error' | 'pending',
         };
-        setSelectedAgent(defaultAgent);
-        setIsModalOpen(true);
-      }
+      });
+      
+      const agentData: AgentData = {
+        id: node.id,
+        ...agentInfo,
+        history: formattedHistory.length > 0 ? formattedHistory : [
+          {
+            id: 'h1',
+            timestamp: new Date().toLocaleString(),
+            action: 'No tasks completed yet',
+            status: 'pending' as const,
+          },
+        ],
+      };
+      
+      setSelectedAgent(agentData);
     }
   }, []);
 
