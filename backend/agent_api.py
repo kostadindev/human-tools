@@ -166,12 +166,14 @@ Response:"""
         result = response.content
         
         # Record task history
-        task_history['agent-1'].append({
+        history_entry = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'action': task[:100] + ('...' if len(task) > 100 else ''),  # Truncate long tasks
             'status': 'success'
-        })
+        }
+        task_history['agent-1'].append(history_entry)
+        print(f"   📝 History recorded: {len(task_history['agent-1'])} total tasks\n")
         
         print(f"   ✅ Analytical agent completed\n")
         return result
@@ -179,12 +181,14 @@ Response:"""
         error_msg = f"Error in analytical agent: {str(e)}"
         
         # Record failed task
-        task_history['agent-1'].append({
+        history_entry = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'action': task[:100] + ('...' if len(task) > 100 else ''),
             'status': 'error'
-        })
+        }
+        task_history['agent-1'].append(history_entry)
+        print(f"   📝 Error history recorded: {len(task_history['agent-1'])} total tasks\n")
         
         print(f"   ❌ Error: {error_msg}\n")
         return error_msg
@@ -216,12 +220,14 @@ Response:"""
         result = response.content
         
         # Record task history
-        task_history['agent-2'].append({
+        history_entry = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'action': task[:100] + ('...' if len(task) > 100 else ''),  # Truncate long tasks
             'status': 'success'
-        })
+        }
+        task_history['agent-2'].append(history_entry)
+        print(f"   📝 History recorded: {len(task_history['agent-2'])} total tasks\n")
         
         print(f"   ✅ Creative agent completed\n")
         return result
@@ -229,12 +235,14 @@ Response:"""
         error_msg = f"Error in creative agent: {str(e)}"
         
         # Record failed task
-        task_history['agent-2'].append({
+        history_entry = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'action': task[:100] + ('...' if len(task) > 100 else ''),
             'status': 'error'
-        })
+        }
+        task_history['agent-2'].append(history_entry)
+        print(f"   📝 Error history recorded: {len(task_history['agent-2'])} total tasks\n")
         
         print(f"   ❌ Error: {error_msg}\n")
         return error_msg
@@ -568,12 +576,17 @@ async def get_agent_history(agent_id: str):
     Get task history for a specific agent or human.
     Supported agent_ids: 'agent-1', 'agent-2', 'human'
     """
+    print(f"\n📊 History request for: {agent_id}")
+    print(f"   Available agents in history: {list(task_history.keys())}")
+    
     if agent_id not in task_history:
+        print(f"   ⚠️  Agent {agent_id} not found, returning empty history")
         return {"history": []}
     
     # Return history in reverse chronological order (newest first)
     history = task_history[agent_id].copy()
     history.reverse()
+    print(f"   ✅ Returning {len(history)} history entries")
     return {"history": history}
 
 
