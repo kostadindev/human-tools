@@ -22,10 +22,17 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and add your GOOGLE_API_KEY
+# Edit .env and add either OPENAI_API_KEY or GOOGLE_API_KEY (or both)
 ```
 
-Get your Google API key from: https://makersuite.google.com/app/apikey
+**API Key Priority:**
+- If `OPENAI_API_KEY` is provided, OpenAI will be used (gpt-4o-mini)
+- Otherwise, if `GOOGLE_API_KEY` is provided, Gemini will be used (gemini-2.5-flash)
+- At least one API key must be provided
+
+**Get API Keys:**
+- OpenAI: https://platform.openai.com/api-keys
+- Google: https://makersuite.google.com/app/apikey
 
 ### 3. Run the Servers
 
@@ -171,7 +178,9 @@ python human_api.py
 ```
 python agent_api.py
 # Output:
-# 🤖 Agent initialized with Gemini 2.5 Flash
+# 🤖 Agents initialized with OpenAI (gpt-4o-mini)
+# OR
+# 🤖 Agents initialized with Gemini (gemini-2.5-flash)
 # ✅ React agent created successfully
 ```
 

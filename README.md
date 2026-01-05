@@ -196,7 +196,10 @@ human-tools/
 
 4. **Create `.env` file:**
    ```bash
-   GOOGLE_API_KEY=your_google_api_key_here
+   # Use either OPENAI_API_KEY or GOOGLE_API_KEY (or both)
+   # OpenAI takes precedence if both are provided
+   OPENAI_API_KEY=your_openai_api_key_here  # Optional
+   GOOGLE_API_KEY=your_google_api_key_here  # Optional (fallback)
    AGENT_API_PORT=8000
    HUMAN_API_PORT=8001
    AGENT_API_URL=http://localhost:8000
@@ -594,10 +597,18 @@ Check `allow_origins` in both `agent_api.py` and `human_api.py` includes your fr
 2. Verify `diagram` field is present in request body
 3. Check backend logs for "Available tools: [...]"
 
-**Gemini API errors:**
-1. Verify `GOOGLE_API_KEY` in `.env`
-2. Check API quota: https://console.cloud.google.com/
-3. Ensure billing is enabled on Google Cloud
+**API errors:**
+1. **OpenAI errors:**
+   - Verify `OPENAI_API_KEY` in `.env`
+   - Check API quota: https://platform.openai.com/usage
+   - Ensure billing is enabled on OpenAI account
+2. **Gemini API errors:**
+   - Verify `GOOGLE_API_KEY` in `.env`
+   - Check API quota: https://console.cloud.google.com/
+   - Ensure billing is enabled on Google Cloud
+3. **No API key provided:**
+   - Ensure at least one of `OPENAI_API_KEY` or `GOOGLE_API_KEY` is set
+   - OpenAI takes precedence if both are provided
 
 ---
 

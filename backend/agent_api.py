@@ -14,9 +14,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.tools import tool
 from langchain_core.prompts import PromptTemplate
+from langchain_core.language_models.chat_models import BaseChatModel
 
 load_dotenv()
 
@@ -43,26 +45,62 @@ task_history: Dict[str, List[Dict[str, Any]]] = {
     'human': [],    # Human agent
 }
 
-# Initialize LLMs for different agents
-orchestrator_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.7,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
+# Determine which API provider to use (OpenAI takes precedence)
+openai_api_key = os.getenv("OPENAI_API_KEY")
+google_api_key = os.getenv("GOOGLE_API_KEY")
 
-agent_1_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.5,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
-
-agent_2_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.9,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
-
-print("🤖 Agents initialized with Gemini 2.5 Flash")
+if openai_api_key:
+    # Use OpenAI if API key is provided
+    provider = "OpenAI"
+    model_name = "gpt-4o-mini"
+    
+    orchestrator_llm: BaseChatModel = ChatOpenAI(
+        model=model_name,
+        temperature=0.7,
+        openai_api_key=openai_api_key
+    )
+    
+    agent_1_llm: BaseChatModel = ChatOpenAI(
+        model=model_name,
+        temperature=0.5,
+        openai_api_key=openai_api_key
+    )
+    
+    agent_2_llm: BaseChatModel = ChatOpenAI(
+        model=model_name,
+        temperature=0.9,
+        openai_api_key=openai_api_key
+    )
+    
+    print(f"🤖 Agents initialized with {provider} ({model_name})")
+elif google_api_key:
+    # Fall back to Gemini if OpenAI key is not provided
+    provider = "Gemini"
+    model_name = "gemini-2.5-flash"
+    
+    orchestrator_llm: BaseChatModel = ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=0.7,
+        google_api_key=google_api_key
+    )
+    
+    agent_1_llm: BaseChatModel = ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=0.5,
+        google_api_key=google_api_key
+    )
+    
+    agent_2_llm: BaseChatModel = ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=0.9,
+        google_api_key=google_api_key
+    )
+    
+    print(f"🤖 Agents initialized with {provider} ({model_name})")
+else:
+    raise ValueError(
+        "No API key provided. Please set either OPENAI_API_KEY or GOOGLE_API_KEY in your .env file."
+    )
 
 
 @tool
