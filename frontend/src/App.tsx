@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Chat from "./components/chat";
+import LandingPage from "./components/LandingPage";
 import { ConfigProvider, theme } from "antd";
 import { DiagramProvider } from "./contexts/DiagramContext";
 
@@ -67,11 +69,22 @@ const App = () => {
         },
       }}
     >
-      <DiagramProvider>
-        <div className="App w-screen h-screen">
-          <Chat />
-        </div>
-      </DiagramProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route
+            path="/chat"
+            element={
+              <DiagramProvider>
+                <div className="App w-screen h-screen">
+                  <Chat />
+                </div>
+              </DiagramProvider>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
     </ConfigProvider>
   );
 };
