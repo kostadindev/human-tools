@@ -2,6 +2,7 @@
 Agent API Server
 Multi-agent orchestration system with specialized AI agents and human-in-the-loop.
 """
+from __future__ import annotations
 import os
 import uuid
 import httpx
