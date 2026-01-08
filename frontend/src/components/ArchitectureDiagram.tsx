@@ -43,7 +43,7 @@ const initialNodes: Node[] = [
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     type: 'default',
-    data: { label: '🎨 Creative', nodeType: 'agent' },
+    data: { label: '🎨 BYOA', nodeType: 'agent' },
     position: { x: 300, y: 80 },
   },
   {
@@ -110,13 +110,13 @@ const agentMetadata: Record<string, Omit<AgentData, 'id' | 'history'>> = {
     capabilities: ['Data Analysis', 'Pattern Recognition', 'Statistical Modeling', 'Report Generation'],
   },
   'agent-2': {
-    name: 'Creative Agent',
+    name: 'BYOA',
     description: 'An innovative agent focused on creative problem-solving, content generation, and artistic expression. This agent brings creativity and out-of-the-box thinking to complex challenges.',
-    type: 'Creative',
-    capabilities: ['Content Generation', 'Creative Writing', 'Design Concepts', 'Brainstorming'],
+    type: 'BYOA',
+    capabilities: ['Content Generation', 'BYOA Writing', 'Design Concepts', 'Brainstorming'],
   },
   'human': {
-    name: 'Human Collaborator',
+    name: 'Human',
     description: 'A human collaborator who provides judgment, preferences, approval, and information that requires human insight. The human collaborator works asynchronously with the AI agents to provide critical input.',
     type: 'Human',
     capabilities: ['Decision Making', 'Judgment', 'Approval', 'Contextual Knowledge'],
