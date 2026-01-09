@@ -335,11 +335,17 @@ def load_constitution(constitution_file: Optional[str] = None, enabled: bool = T
 # ============================================================================
 USE_CONSTITUTION = False  # <-- Change this to False to disable constitution
 
+CURRENT_CONSTITUTION_FILE: Optional[str] = None
+
 # Load constitution at startup
 # Priority: 1) CONSTITUTION_ENABLED variable, 2) USE_CONSTITUTION env var, 3) default True
 env_override = os.getenv("USE_CONSTITUTION")
+CURRENT_CONSTITUTION_FILE = os.getenv("CONSTITUTION_FILE", "cambridge_university_v1.txt")
 
-CONSTITUTION_TEXT = load_constitution(enabled=USE_CONSTITUTION)
+CONSTITUTION_TEXT = load_constitution(
+    constitution_file=CURRENT_CONSTITUTION_FILE,
+    enabled=USE_CONSTITUTION
+)
 
 # Debug output
 print(f"🔧 Constitution configuration:")
@@ -610,13 +616,15 @@ async def set_constitution_config(config: ConstitutionConfig):
     Dynamically enable or disable the constitution and optionally set the file.
     WARNING: This modifies global state. Intended for testing purposes.
     """
-    global USE_CONSTITUTION, CONSTITUTION_TEXT, prompt
+    global USE_CONSTITUTION, CONSTITUTION_TEXT, prompt, CURRENT_CONSTITUTION_FILE
     
     USE_CONSTITUTION = config.enabled
+    if config.file_name:
+        CURRENT_CONSTITUTION_FILE = config.file_name
     
-    # Reload constitution text based on new setting and optional file name
+    # Reload constitution text based on new setting and current file name
     CONSTITUTION_TEXT = load_constitution(
-        constitution_file=config.file_name,
+        constitution_file=CURRENT_CONSTITUTION_FILE,
         enabled=USE_CONSTITUTION
     )
     
@@ -704,7 +712,7 @@ async def get_constitution_status():
     return {
         "enabled": USE_CONSTITUTION,
         "loaded": bool(CONSTITUTION_TEXT),
-        "constitution_file": os.getenv("CONSTITUTION_FILE", "cambridge_university_v1.txt") if USE_CONSTITUTION else None,
+        "constitution_file": CURRENT_CONSTITUTION_FILE if USE_CONSTITUTION else None,
         "constitution_length": len(CONSTITUTION_TEXT) if CONSTITUTION_TEXT else 0
     }
 
