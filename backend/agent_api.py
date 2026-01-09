@@ -7,6 +7,7 @@ import os
 import uuid
 import httpx
 import threading
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from fastapi import FastAPI
@@ -42,7 +43,6 @@ pending_callbacks: dict = {}
 # agent_id -> List[TaskHistory]
 task_history: Dict[str, List[Dict[str, Any]]] = {
     'agent-1': [],  # Analytical agent
-    'agent-2': [],  # Creative agent
     'human': [],    # Human agent
 }
 
@@ -67,12 +67,6 @@ if openai_api_key:
         openai_api_key=openai_api_key
     )
     
-    agent_2_llm: BaseChatModel = ChatOpenAI(
-        model=model_name,
-        temperature=0.9,
-        openai_api_key=openai_api_key
-    )
-    
     print(f"🤖 Agents initialized with {provider} ({model_name})")
 elif google_api_key:
     # Fall back to Gemini if OpenAI key is not provided
@@ -88,12 +82,6 @@ elif google_api_key:
     agent_1_llm: BaseChatModel = ChatGoogleGenerativeAI(
         model=model_name,
         temperature=0.5,
-        google_api_key=google_api_key
-    )
-    
-    agent_2_llm: BaseChatModel = ChatGoogleGenerativeAI(
-        model=model_name,
-        temperature=0.9,
         google_api_key=google_api_key
     )
     
@@ -233,69 +221,15 @@ Response:"""
         return error_msg
 
 
-@tool
-def creative_agent(task: str) -> str:
-    """
-    A creative AI agent specialized in brainstorming, ideation, and creative problem-solving.
-    Use this agent for tasks requiring: creativity, idea generation, storytelling, or innovative solutions.
-    """
-    print(f"\n🎨 TOOL CALLED: creative_agent")
-    print(f"   Task: {task}")
-
-    try:
-        prompt = f"""You are a creative AI agent specialized in brainstorming and innovative thinking.
-
-Task: {task}
-
-Provide a creative, innovative response. Focus on:
-- Out-of-the-box thinking
-- Creative solutions and ideas
-- Multiple perspectives
-- Imaginative approaches
-
-Response:"""
-
-        response = agent_2_llm.invoke(prompt)
-        result = response.content
-        
-        # Record task history
-        history_entry = {
-            'id': str(uuid.uuid4()),
-            'timestamp': datetime.now().isoformat(),
-            'action': task[:100] + ('...' if len(task) > 100 else ''),  # Truncate long tasks
-            'status': 'success'
-        }
-        task_history['agent-2'].append(history_entry)
-        print(f"   📝 History recorded: {len(task_history['agent-2'])} total tasks\n")
-        
-        print(f"   ✅ Creative agent completed\n")
-        return result
-    except Exception as e:
-        error_msg = f"Error in creative agent: {str(e)}"
-        
-        # Record failed task
-        history_entry = {
-            'id': str(uuid.uuid4()),
-            'timestamp': datetime.now().isoformat(),
-            'action': task[:100] + ('...' if len(task) > 100 else ''),
-            'status': 'error'
-        }
-        task_history['agent-2'].append(history_entry)
-        print(f"   📝 Error history recorded: {len(task_history['agent-2'])} total tasks\n")
-        
-        print(f"   ❌ Error: {error_msg}\n")
-        return error_msg
-
-
 # All available tools
 ALL_TOOLS = {
-    'agent': [analytical_agent, creative_agent],
+    'agent': [analytical_agent],
     'human': [query_human],
 }
 
 # Map node types to tool names
 TOOL_MAP = {
-    'agent': ['analytical_agent', 'creative_agent'],
+    'agent': ['analytical_agent'],
     'human': ['query_human'],
 }
 
@@ -307,7 +241,7 @@ def get_tools_from_diagram(diagram: Optional[DiagramStructure]) -> List:
     """
     if not diagram:
         # If no diagram provided, use all tools (backward compatibility)
-        return [analytical_agent, creative_agent, query_human]
+        return [analytical_agent, query_human]
 
     # Find orchestrator node
     orchestrator_id = None
@@ -318,7 +252,7 @@ def get_tools_from_diagram(diagram: Optional[DiagramStructure]) -> List:
 
     if not orchestrator_id:
         print("⚠️  No orchestrator found in diagram, using all tools")
-        return [analytical_agent, creative_agent, query_human]
+        return [analytical_agent, query_human]
 
     # Find what the orchestrator is connected to
     connected_node_ids = set()
@@ -333,8 +267,8 @@ def get_tools_from_diagram(diagram: Optional[DiagramStructure]) -> List:
     for node in diagram.nodes:
         if node.id in connected_node_ids:
             if node.type == 'agent':
-                available_tools.extend([analytical_agent, creative_agent])
-                tool_names.extend(['analytical_agent', 'creative_agent'])
+                available_tools.append(analytical_agent)
+                tool_names.append('analytical_agent')
             elif node.type == 'human':
                 available_tools.append(query_human)
                 tool_names.append('query_human')
@@ -349,17 +283,80 @@ def get_tools_from_diagram(diagram: Optional[DiagramStructure]) -> List:
 
     if not unique_tools:
         print("⚠️  No tools connected in diagram, using all tools as fallback")
-        return [analytical_agent, creative_agent, query_human]
+        return [analytical_agent, query_human]
 
     print(f"🔧 Tools enabled from diagram: {[t.name for t in unique_tools]}")
     return unique_tools
 
 
 # Default tools (will be overridden by diagram)
-tools = [analytical_agent, creative_agent, query_human]
+tools = [analytical_agent, query_human]
+
+
+def load_constitution(constitution_file: Optional[str] = None, enabled: bool = True) -> str:
+    """
+    Load constitution text from file.
+    Defaults to cambridge_university_v1.txt if no file specified.
+    
+    Args:
+        constitution_file: Name of the constitution file to load
+        enabled: Whether to load the constitution (if False, returns empty string)
+    """
+    if not enabled:
+        print("📋 Constitution disabled (USE_CONSTITUTION=false)")
+        return ""
+    
+    if constitution_file is None:
+        constitution_file = os.getenv("CONSTITUTION_FILE", "cambridge_university_v1.txt")
+    
+    constitutions_dir = Path(__file__).parent / "constitutions"
+    constitution_path = constitutions_dir / constitution_file
+    
+    if not constitution_path.exists():
+        print(f"⚠️  Constitution file not found: {constitution_path}")
+        print(f"   Using default empty constitution")
+        return ""
+    
+    try:
+        with open(constitution_path, 'r', encoding='utf-8') as f:
+            constitution_text = f.read()
+        print(f"✅ Loaded constitution from: {constitution_path}")
+        return constitution_text
+    except Exception as e:
+        print(f"❌ Error loading constitution: {e}")
+        return ""
+
+
+# ============================================================================
+# CONSTITUTION CONFIGURATION
+# ============================================================================
+# Set this to True to enable the constitution, False to disable it
+# You can also override via USE_CONSTITUTION environment variable
+# ============================================================================
+USE_CONSTITUTION = False  # <-- Change this to False to disable constitution
+
+# Load constitution at startup
+# Priority: 1) CONSTITUTION_ENABLED variable, 2) USE_CONSTITUTION env var, 3) default True
+env_override = os.getenv("USE_CONSTITUTION")
+
+CONSTITUTION_TEXT = load_constitution(enabled=USE_CONSTITUTION)
+
+# Debug output
+print(f"🔧 Constitution configuration:")
+print(f"   CONSTITUTION_ENABLED (code variable): {USE_CONSTITUTION}")
+print(f"   USE_CONSTITUTION env var: {os.getenv('USE_CONSTITUTION', 'not set')}")
+print(f"   Final USE_CONSTITUTION value: {USE_CONSTITUTION}")
+print(f"   CONSTITUTION_TEXT loaded: {len(CONSTITUTION_TEXT) if CONSTITUTION_TEXT else 0} characters")
+
 
 # Orchestrator prompt template
-template = """You are an orchestrator agent coordinating a team of specialized agents and a human collaborator.
+template = """You are an orchestrator agent that coordinates specialized AI agents and human collaborators to fulfill user requests.
+
+YOUR ROLE:
+- Evaluate user requests and determine the appropriate response strategy
+- Select and invoke available tools (agents or human) to accomplish tasks
+- Synthesize responses from tools into coherent final answers
+- Apply any required stylization or formatting based on the constitution
 
 AVAILABLE TOOLS - You can ONLY use these tools (no others):
 
@@ -368,26 +365,44 @@ AVAILABLE TOOLS - You can ONLY use these tools (no others):
 Your available tools are ONLY: [{tool_names}]
 
 Tool Descriptions:
-- analytical_agent: Use for tasks requiring logical reasoning, data analysis, evaluation, or structured thinking
-- creative_agent: Use for tasks requiring brainstorming, ideation, storytelling, or innovative solutions
-- query_human: Use when you need human judgment, preferences, approval, or information only a human would know
+- analytical_agent: An AI agent that performs logical reasoning, data analysis, evaluation, and structured thinking
+- query_human: A tool to request human input, judgment, or handoff when human oversight is needed
 
-CRITICAL RULES:
-1. ONLY use tools from [{tool_names}] - no other tools exist for you
-2. If the user asks you to use a tool that is NOT in your available tools list:
-   - Simply state: "I cannot do that because [tool_name] is not available in the current configuration."
-   - List what tools you DO have available: [{tool_names}]
-   - Do NOT try to work around it or use the unavailable tool
-   - Provide your Final Answer immediately explaining the limitation
-3. If you can answer the user's question directly without any tools, do so
-4. You can use multiple available tools in sequence if needed
-5. After getting responses from tools, synthesize them into a complete answer
-6. ALWAYS provide a Final Answer - never leave without responding
+HOW TO OPERATE:
+
+1. **Request Evaluation**: 
+   - Read and understand the user's request
+   - Evaluate the request against the constitution rules (if provided)
+   - Determine if the request can be fulfilled, should be refused, or requires human handoff
+   - If the request should be refused: Provide a refusal response based on constitution rules
+   - If the request should be fulfilled: Proceed to tool selection
+   - If the request requires human oversight based on the policies in the constitution or inability of the agents to fulfill the request: Use query_human tool
+
+2. **Tool Selection**:
+   - If the request can be fulfilled: Select the appropriate agent tool(s) to accomplish the task
+   - If the request requires human oversight: Use query_human tool
+   - If the request should be refused: Provide a refusal response based on constitution rules
+
+3. **Response Processing**:
+   - Invoke selected tools with appropriate inputs
+   - Receive responses from tools
+   - Apply any required stylization or formatting as specified in the constitution
+   - Synthesize tool responses into a coherent final answer
+
+4. **Tool Limitations**:
+   - ONLY use tools from [{tool_names}] - no other tools exist
+   - If a requested tool is not available, explain the limitation and list available tools
+   - Do not attempt to work around unavailable tools
+
+5. **Response Format**:
+   - Always provide a Final Answer after processing
+   - Return response in accordance and stylization with the constitution
+   - If uncertain about constitution compliance, default to query_human rather than proceeding
 
 Use the following format:
 
 Question: the input question you must answer
-Thought: think about what approach to take (direct answer or which available tool(s) to use)
+Thought: think about what approach to take (evaluate against constitution, select tools, or provide direct answer)
 Action: the action to take, MUST be one of [{tool_names}]
 Action Input: the input to the action
 Observation: the result of the action
@@ -400,9 +415,42 @@ Begin!
 Question: {input}
 Thought:{agent_scratchpad}"""
 
-prompt = PromptTemplate.from_template(template)
+def create_orchestrator_prompt(constitution_text: str = "") -> PromptTemplate:
+    """Create orchestrator prompt with constitution included."""
+    constitution_section = ""
+    if constitution_text and constitution_text.strip():
+        constitution_section = f"""CONSTITUTION (You MUST abide by these rules):
 
-print("✅ Orchestrator system initialized\n")
+{constitution_text}
+
+---
+"""
+    
+    full_template = constitution_section + template
+    try:
+        return PromptTemplate.from_template(full_template)
+    except Exception as e:
+        print(f"❌ Error creating prompt template: {e}")
+        print(f"   Constitution enabled: {bool(constitution_text)}")
+        print(f"   Template length: {len(full_template)}")
+        raise
+
+# Initialize prompt with constitution (respects USE_CONSTITUTION flag)
+try:
+    prompt = create_orchestrator_prompt(CONSTITUTION_TEXT if USE_CONSTITUTION else "")
+    if USE_CONSTITUTION:
+        print("✅ Orchestrator system initialized with constitution enabled\n")
+    else:
+        print("✅ Orchestrator system initialized without constitution (comparison mode)\n")
+except Exception as e:
+    print(f"❌ Failed to initialize orchestrator prompt: {e}")
+    print(f"   Attempting to initialize without constitution...")
+    try:
+        prompt = create_orchestrator_prompt("")
+        print("✅ Orchestrator system initialized without constitution (fallback mode)\n")
+    except Exception as e2:
+        print(f"❌ Critical error: Failed to initialize orchestrator even without constitution: {e2}")
+        raise
 
 
 class Message(BaseModel):
@@ -468,8 +516,10 @@ async def generate_streaming_response(history: List[Message], diagram: Optional[
             print(f"   Orchestrator ACTUALLY connected to: {connected_labels}")
             print(f"   Available tools: {list(active_tool_names)}")
 
-        # Create dynamic agent executor with diagram-filtered tools
-        orchestrator_agent = create_react_agent(orchestrator_llm, active_tools, prompt)
+        # Create dynamic agent executor with diagram-filtered tools and constitution-aware prompt
+        # Recreate prompt with current constitution (respects USE_CONSTITUTION flag)
+        current_prompt = create_orchestrator_prompt(CONSTITUTION_TEXT if USE_CONSTITUTION else "")
+        orchestrator_agent = create_react_agent(orchestrator_llm, active_tools, current_prompt)
         executor = AgentExecutor(
             agent=orchestrator_agent,
             tools=active_tools,
@@ -479,41 +529,15 @@ async def generate_streaming_response(history: List[Message], diagram: Optional[
             early_stopping_method="force"
         )
 
-        # Track tool calls - ONLY for available tools
-        all_tool_messages = {
-            "query_human": "🤔 Asking human for help... please wait for their response.",
-            "analytical_agent": "🔬 Consulting analytical agent...",
-            "creative_agent": "🎨 Consulting creative agent..."
-        }
-        # Filter to only show messages for available tools
-        tool_messages = {
-            tool_name: msg
-            for tool_name, msg in all_tool_messages.items()
-            if tool_name in active_tool_names
-        }
-        shown_tool_messages = set()
-
         # Run orchestrator and stream response
         response_generated = False
         async for chunk in executor.astream({"input": last_user_message}):
-            # Stream tool actions (when orchestrator decides to use a tool)
+            # Validate tool is available (but don't show tool messages to user)
             if "actions" in chunk:
                 for action in chunk["actions"]:
-                    # Validate tool is available
                     if action.tool not in active_tool_names:
                         print(f"⚠️  Agent tried to use unavailable tool: {action.tool}")
                         continue
-
-                    if action.tool in tool_messages and action.tool not in shown_tool_messages:
-                        yield tool_messages[action.tool]
-                        shown_tool_messages.add(action.tool)
-
-            # When tool completes
-            if "steps" in chunk:
-                for step in chunk["steps"]:
-                    tool_name = step.action.tool
-                    if tool_name in shown_tool_messages:
-                        yield "\n\n✅ Response received! Processing...\n\n"
 
             # Stream final output
             if "output" in chunk:
@@ -575,6 +599,42 @@ async def suggest_followups(request: ChatRequest):
     return SuggestionResponse(suggestions=suggestions)
 
 
+class ConstitutionConfig(BaseModel):
+    enabled: bool
+    file_name: Optional[str] = None
+
+
+@app.post("/constitution/config")
+async def set_constitution_config(config: ConstitutionConfig):
+    """
+    Dynamically enable or disable the constitution and optionally set the file.
+    WARNING: This modifies global state. Intended for testing purposes.
+    """
+    global USE_CONSTITUTION, CONSTITUTION_TEXT, prompt
+    
+    USE_CONSTITUTION = config.enabled
+    
+    # Reload constitution text based on new setting and optional file name
+    CONSTITUTION_TEXT = load_constitution(
+        constitution_file=config.file_name,
+        enabled=USE_CONSTITUTION
+    )
+    
+    # Re-initialize prompt
+    try:
+        prompt = create_orchestrator_prompt(CONSTITUTION_TEXT if USE_CONSTITUTION else "")
+        status_msg = "enabled" if USE_CONSTITUTION else "disabled"
+        print(f"\n🔧 Constitution dynamically {status_msg}")
+        return {
+            "message": f"Constitution {status_msg}",
+            "enabled": USE_CONSTITUTION,
+            "constitution_length": len(CONSTITUTION_TEXT)
+        }
+    except Exception as e:
+        print(f"❌ Error updating constitution config: {e}")
+        return {"error": str(e)}
+
+
 class CallbackRequest(BaseModel):
     query_id: str
     response: str
@@ -613,7 +673,7 @@ async def ping():
 async def get_agent_history(agent_id: str):
     """
     Get task history for a specific agent or human.
-    Supported agent_ids: 'agent-1', 'agent-2', 'human'
+    Supported agent_ids: 'agent-1', 'human'
     """
     print(f"\n📊 History request for: {agent_id}")
     print(f"   Available agents in history: {list(task_history.keys())}")
@@ -633,6 +693,20 @@ async def get_agent_history(agent_id: str):
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "agent-api"}
+
+
+@app.get("/constitution/status")
+async def get_constitution_status():
+    """
+    Get the current constitution status.
+    Useful for comparing responses with and without constitution.
+    """
+    return {
+        "enabled": USE_CONSTITUTION,
+        "loaded": bool(CONSTITUTION_TEXT),
+        "constitution_file": os.getenv("CONSTITUTION_FILE", "cambridge_university_v1.txt") if USE_CONSTITUTION else None,
+        "constitution_length": len(CONSTITUTION_TEXT) if CONSTITUTION_TEXT else 0
+    }
 
 
 if __name__ == "__main__":

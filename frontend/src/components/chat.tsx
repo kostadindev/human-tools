@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
 import { Button, Input, Layout, theme, Tabs } from "antd";
-import { SendOutlined, ReloadOutlined } from "@ant-design/icons";
+import { SendOutlined, ReloadOutlined, DownloadOutlined } from "@ant-design/icons";
 import { DarkModeSwitch } from "react-toggle-dark-mode";
 import { useChat } from "../hooks/useChat";
 import { MessageList } from "./MessageList";
@@ -163,6 +163,28 @@ const ChatComponent: React.FC = () => {
     }
   };
 
+  const handleDownloadConversation = () => {
+    const conversationData = {
+      metadata: {
+        exportedAt: new Date().toISOString(),
+        messageCount: messages.length,
+        appName: UI_CONFIG.name ?? DEFAULT_NAME,
+      },
+      messages: messages,
+    };
+
+    const jsonString = JSON.stringify(conversationData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `conversation-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const headerStyle: React.CSSProperties = {
     height: "80px",
     display: "flex",
@@ -216,6 +238,13 @@ const ChatComponent: React.FC = () => {
                 checked={isDarkMode}
                 onChange={toggleDarkMode}
                 size={25}
+              />
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadConversation}
+                title="Download Conversation (JSON)"
+                disabled={messages.length === 0}
+                onMouseDown={(e) => e.preventDefault()}
               />
               <Button
                 icon={<ReloadOutlined />}
